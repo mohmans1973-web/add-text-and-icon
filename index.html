@@ -1,0 +1,210 @@
+﻿<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>رفع صورة وإضافة نص وأيقونة</title>
+    <style>
+        body {
+            text-align: center;
+            margin: 20px;
+        }
+        #canvas {
+            border: 1px solid #000;
+            margin-top: 20px;
+            display: none; /* إخفاء الـ canvas في البداية */
+        }
+    </style>
+</head>
+<body>
+    <h1>رفع صورة وإضافة نص وأيقونة</h1>
+    <input type="file" id="imageUpload" accept="image/*">
+    <br><br>
+    
+    <label for="text">النص:</label>
+    <input type="text" id="text" placeholder="أدخل النص هنا">
+    
+    <label for="color">لون النص:</label>
+    <input type="color" id="color" value="#000000">
+    
+    <label for="fontSize">حجم النص:</label>
+    <input type="number" id="fontSize" value="20">
+    
+    <button id="addText">إضافة النص</button>
+    <button id="clearText">مسح النصوص</button>
+    <button id="download">تحميل الصورة</button>
+    
+    <br><br>
+    
+    <input type="file" id="iconUpload" accept="image/*">
+    <label for="iconSize">حجم الأيقونة:</label>
+    <input type="number" id="iconSize" value="50" min="1">
+    <button id="addIcon">إضافة الأيقونة</button>
+    <button id="clearIcons">مسح الأيقونات</button> <!-- زر لمسح الأيقونات -->
+    
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const imageUpload = document.getElementById('imageUpload');
+        const iconUpload = document.getElementById('iconUpload');
+        let img = new Image();
+        let icon = new Image(); // متغير لتخزين الأيقونة
+        let icons = []; // مصفوفة لتخزين الأيقونات
+        let textItems = [];
+        let isDraggingIcon = false;
+        let offsetX, offsetY;
+        let isDraggingText = false;
+        let dragTextIndex = -1;
+        let dragIconIndex = -1;
+
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                img.src = e.target.result;
+                img.onload = () => {
+                    // ضبط أبعاد الـ canvas بناءً على أبعاد الصورة
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    drawText();
+                    drawIcons(); // رسم الأيقونات عند تحميل الصورة
+                    canvas.style.display = 'block'; // عرض الـ canvas بعد تحميل الصورة
+                }
+            }
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('addText').addEventListener('click', () => {
+            const text = document.getElementById('text').value;
+            const color = document.getElementById('color').value;
+            const fontSize = document.getElementById('fontSize').value;
+            const position = { x: 50, y: 50, text, color, fontSize };
+            textItems.push(position);
+            drawText();
+        });
+
+        function drawText() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            drawIcons(); // رسم الأيقونات
+            textItems.forEach(item => {
+                ctx.font = `${item.fontSize}px Arial`;
+                ctx.fillStyle = item.color;
+                ctx.fillText(item.text, item.x, item.y);
+            });
+        }
+
+        function drawIcons() {
+            icons.forEach(icon => {
+                ctx.drawImage(icon.image, icon.x, icon.y, icon.size, icon.size);
+            });
+        }
+
+        canvas.addEventListener('mousedown', (event) => {
+            const mouseX = event.offsetX;
+            const mouseY = event.offsetY;
+
+            // التحقق من سحب النص
+            textItems.forEach((item, index) => {
+                ctx.font = `${item.fontSize}px Arial`;
+                const textWidth = ctx.measureText(item.text).width;
+                if (mouseX >= item.x && mouseX <= item.x + textWidth &&
+                    mouseY >= item.y - item.fontSize && mouseY <= item.y) {
+                    isDraggingText = true;
+                    dragTextIndex = index;
+                    offsetX = mouseX - item.x;
+                    offsetY = mouseY - item.y;
+                }
+            });
+
+            // التحقق من سحب الأيقونة
+            icons.forEach((icon, index) => {
+                if (mouseX >= icon.x && mouseX <= icon.x + icon.size &&
+                    mouseY >= icon.y && mouseY <= icon.y + icon.size) {
+                    isDraggingIcon = true;
+                    dragIconIndex = index;
+                    offsetX = mouseX - icon.x;
+                    offsetY = mouseY - icon.y;
+                }
+            });
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (isDraggingText) {
+                const mouseX = event.offsetX;
+                const mouseY = event.offsetY;
+                textItems[dragTextIndex].x = mouseX - offsetX;
+                textItems[dragTextIndex].y = mouseY - offsetY;
+                drawText();
+            }
+            if (isDraggingIcon) {
+                const mouseX = event.offsetX;
+                const mouseY = event.offsetY;
+                icons[dragIconIndex].x = mouseX - offsetX;
+                icons[dragIconIndex].y = mouseY - offsetY;
+                drawText();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDraggingText = false;
+            dragTextIndex = -1;
+            isDraggingIcon = false;
+            dragIconIndex = -1;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDraggingText = false;
+            dragTextIndex = -1;
+            isDraggingIcon = false;
+            dragIconIndex = -1;
+        });
+
+        document.getElementById('download').addEventListener('click', () => {
+            const dataURL = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.href = dataURL;
+            link.download = 'modified_image.png';
+            link.click();
+        });
+
+        document.getElementById('clearText').addEventListener('click', () => {
+            textItems = []; // مسح جميع النصوص
+            drawText(); // إعادة رسم الصورة بدون نصوص
+        });
+
+        iconUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                icon.src = e.target.result; // تعيين الأيقونة
+                icon.onload = () => {
+                    // تعيين موقع الأيقونة بعد تحميلها
+                    const iconSize = document.getElementById('iconSize').value;
+                    const iconPosition = { x: 100, y: 100, size: iconSize, image: icon };
+                    icons.push(iconPosition); // إضافة الأيقونة إلى المصفوفة
+                    drawText(); // إعادة رسم الأيقونات
+                }
+            }
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('addIcon').addEventListener('click', () => {
+            // إضافة نفس الأيقونة مرة أخرى
+            const iconSize = document.getElementById('iconSize').value;
+            const iconPosition = { x: 100, y: 100, size: iconSize, image: icon };
+            icons.push(iconPosition); // إضافة الأيقونة إلى المصفوفة
+            drawText(); // إعادة رسم الأيقونات
+        });
+
+        document.getElementById('clearIcons').addEventListener('click', () => {
+            icons = []; // مسح جميع الأيقونات
+            drawText(); // إعادة رسم الصورة بدون أيقونات
+        });
+    </script>
+</body>
+</html>
